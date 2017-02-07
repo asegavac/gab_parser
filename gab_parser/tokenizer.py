@@ -33,31 +33,32 @@
 import re
 
 
-class LexError(Exception):
+class TokenizerError(Exception):
     """
     Exception thrown when invalid token encountered and no default error
     handler is defined.
     """
 
     def __init__(self, message, s):
-        self.args = (message,)
+        super().__init__(message)
         self.text = s
 
 
-class LexToken(object):
+class TokenizerToken(object):
     """
     Token class.  This class is used to represent the tokens produced.
     """
 
-    def __init__(self, lexer, token_type, value, pos, context={}):
+    def __init__(self, tokenizer, token_type, value, pos, context={}):
+        self.tokenizer = tokenizer
         self.token_type = token_type
         self.value = value
         self.pos = pos
         self.context = context
 
     def __str__(self):
-        return 'LexToken(%s,%r,%d)' % (
-            self.tokentype, self.value, self.pos)
+        return '<TokenizerToken type="%s" value="%r" pos="%d">' % (
+            self.token_type, self.value, self.pos)
 
     def __repr__(self):
         return str(self)
@@ -74,7 +75,7 @@ class State(object):
         self.inclusive = inclusive
         self.ignore = ignore
         self.error_function = error_function
-        self.reflags
+        self.reflags = reflags
         self._regex = None
 
     @property
@@ -106,8 +107,8 @@ class State(object):
                     token = next(token
                                  for token in self.tokens
                                  if token.name == f)
-                    if token.value_func:
-                        indexfunc[i] = (token.value_funcion, f)
+                    if token.value_function:
+                        indexfunc[i] = (token.value_function, f)
                     else:
                         if token.ignore:
                             indexfunc[i] = (None, None)
@@ -117,7 +118,8 @@ class State(object):
                     pass
 
             return [(regex, indexfunc)]
-        except Exception:
+        except Exception as e:
+            print(e)
             m = int(len(relist) / 2)
             if m == 0:
                 m = 1
@@ -146,21 +148,21 @@ class Token(object):
 
     def __repr__(self):
         return(
-            '<Token name="{}" regex="{}" value_function="{}" self.ignore={}'
+            '<Token name="{}" regex="{}" value_function="{}" self.ignore={}>'
             .format(self.name,
                     self.regex,
                     self.value_funcion.__name__,
                     self.ignore))
 
 
-class Lexer:
+class Tokenizer:
     """
-    Base Lexer class
+    Base Tokenizer class
     """
 
     def __init__(self, states):
         self.states = states
-        self._statestack = None    # Stack of lexer states
+        self._statestack = None    # Stack of states
         self.data = None           # Actual input data (as a string)
         self.pos = 0               # Current position in input text
         self.len = 0               # Length of the input text
@@ -202,7 +204,7 @@ class Lexer:
         ignore = ''
         for state in self._get_active_states():
             ignore += state.ignore
-        return re
+        return ignore
 
     @property
     def error_function(self):
@@ -225,7 +227,7 @@ class Lexer:
 
     def input(self, s, context={}, state_name=None):
         """
-        Push a new string into the lexer.
+        Push a new string into the tokenizer.
         Resets all state, and will set the state stack
         to the first state if no state name is specified.
         """
@@ -264,7 +266,7 @@ class Lexer:
 
     def token(self):
         """
-        Return the next token from the Lexer,
+        Return the next token from the Tokenizer,
         return None if no more tokens.
         """
         # Make local copies of frequently referenced attributes
@@ -286,7 +288,7 @@ class Lexer:
 
                 # Create a token for return
                 func, token_type = indexfunc[m.lastindex]
-                token = LexToken(self, token_type, m.group(), pos)
+                token = TokenizerToken(self, token_type, m.group(), pos)
 
                 if not func:
                     # If no token type was set, it's an ignored token
@@ -302,12 +304,17 @@ class Lexer:
                 # If token is processed by a function, call it
                 self.pos = pos
 
-                new_token = func(token)
+                value = func(token, self)
+                if isinstance(value, TokenizerToken):
+                    new_token = value
+                else:
+                    new_token = token
+                    new_token.value = value
 
                 # Every function must return a token,
                 # if nothing, we just move to next token
                 if not new_token:
-                    # This is here in case user has updated lexpos.
+                    # This is here in case user has updated pos.
                     pos = self.pos
                     break
                 return new_token
@@ -315,13 +322,13 @@ class Lexer:
 
                 # No match. Call t_error() if defined.
                 if self.error_function:
-                    token = LexToken(self, 'error', self.data[pos:], pos)
+                    token = TokenizerToken(self, 'error', self.data[pos:], pos)
                     self.pos = pos
                     new_token = self.error_function(token)
                     if pos == self.pos:
                         # Error method didn't change text position at all.
                         # This is an error.
-                        raise LexError(
+                        raise TokenizerError(
                             "Scanning error. Illegal character '%s'"
                             % (data[pos]), data[pos:])
                     pos = self.pos
@@ -330,7 +337,7 @@ class Lexer:
                     return new_token
 
                 self.pos = pos
-                raise LexError(
+                raise TokenizerError(
                     "Illegal character '%s' at index %d"
                     % (data[pos], pos), data[pos:])
 
@@ -339,13 +346,13 @@ class Lexer:
 
     def __iter__(self):
         """
-        Return the lexer as an iterator
+        Return the tokenizer as an iterator
         """
         return self
 
     def __next__(self):
         """
-        Allow the lexer to be used as an iterator.
+        Allow the tokenizer to be used as an iterator.
         """
         t = self.token()
         if t is None:

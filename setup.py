@@ -2,7 +2,7 @@ from setuptools import setup
 
 
 setup(name="Gab Parser",
-      description="Python Lex & Yacc",
+      description="Python Tokenization & Parsing",
       long_description="""Gab Parser""",
       license="""BSD""",
       version="0.0.1",
@@ -12,5 +12,4 @@ setup(name="Gab Parser",
       packages=['gab_parser'],
       classifiers=[
         'Programming Language :: Python :: 3',
-      ]
-      )
+      ])
