@@ -23,7 +23,7 @@ omit =
     # omit everything in /usr
     /usr/*
     # tests themselves
-    */test_*
+    tests/*
 
 ignore_errors = True
 

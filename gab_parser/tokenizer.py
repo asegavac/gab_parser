@@ -49,8 +49,7 @@ class TokenizerToken(object):
     Token class.  This class is used to represent the tokens produced.
     """
 
-    def __init__(self, tokenizer, token_type, value, pos, context={}):
-        self.tokenizer = tokenizer
+    def __init__(self, token_type, value, pos, context={}):
         self.token_type = token_type
         self.value = value
         self.pos = pos
@@ -119,7 +118,6 @@ class State(object):
 
             return [(regex, indexfunc)]
         except Exception as e:
-            print(e)
             m = int(len(relist) / 2)
             if m == 0:
                 m = 1
@@ -133,7 +131,7 @@ class State(object):
             .format(self.name,
                     self.inclusive,
                     self.ignore,
-                    self.error_function.__name__))
+                    self.error_function))
 
 
 class Token(object):
@@ -175,7 +173,7 @@ class Tokenizer:
         included.
         """
         states = []
-        for state in reversed(self.states):
+        for state in reversed(self._statestack):
             states.append(state)
             if not state.inclusive:
                 break
@@ -223,7 +221,7 @@ class Tokenizer:
             return next(
                 state for state in self.states if state.name == state_name)
         except StopIteration:
-            raise ValueError('Undefined state')
+            raise ValueError('Undefined state: {}'.format(state_name))
 
     def input(self, s, context={}, state_name=None):
         """
@@ -288,7 +286,7 @@ class Tokenizer:
 
                 # Create a token for return
                 func, token_type = indexfunc[m.lastindex]
-                token = TokenizerToken(self, token_type, m.group(), pos)
+                token = TokenizerToken(token_type, m.group(), pos)
 
                 if not func:
                     # If no token type was set, it's an ignored token
@@ -307,24 +305,22 @@ class Tokenizer:
                 value = func(token, self)
                 if isinstance(value, TokenizerToken):
                     new_token = value
+                elif value is None:
+                    # This is here in case user has updated pos.
+                    pos = self.pos
+                    break
                 else:
                     new_token = token
                     new_token.value = value
 
-                # Every function must return a token,
-                # if nothing, we just move to next token
-                if not new_token:
-                    # This is here in case user has updated pos.
-                    pos = self.pos
-                    break
                 return new_token
             else:
 
                 # No match. Call t_error() if defined.
                 if self.error_function:
-                    token = TokenizerToken(self, 'error', self.data[pos:], pos)
+                    token = TokenizerToken('error', self.data[pos:], pos)
                     self.pos = pos
-                    new_token = self.error_function(token)
+                    new_token = self.error_function(token, self)
                     if pos == self.pos:
                         # Error method didn't change text position at all.
                         # This is an error.
