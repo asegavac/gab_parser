@@ -5,8 +5,8 @@
 
 Overall: Not working
 
-- [x] convert lex into the new style
-- [ ] get lex working and tested
+- [x] convert tokenizer into the new style
+- [x] get tokenizer working and tested
 - [x] begin converting yacc into the new style
 - [ ] finish converting yacc into the new style
 - [ ] get yacc working and tested
@@ -39,9 +39,9 @@ Gab Parser
 
 ## How to Use
 
-Gab consists of two files : lex.py and yacc.py.
+Gab consists of two files : tokenizer.py and yacc.py.
 ```
-import gab_parser.lex as lex
+import gab_parser.tokenizer as tokenizer
 import gab_parser.yacc as yacc
 ```
 
